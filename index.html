@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TERKOS — Driver Schedule</title>
+<style>
+  :root{
+    --bg:#f7f3e9;
+    --panel:#ffffff;
+    --panel-2:#f0ead9;
+    --line:#e0d6bf;
+    --ink:#2c2618;
+    --ink-dim:#6b6047;
+    --ink-faint:#9a8e72;
+    --gold:#c62828;
+    --gold-soft:#a01f1f;
+    --oats:#6b4ce8;
+    --wheat:#ffd633;
+    --barley:#2d6cdf;
+    --canola:#525c68;
+    --peas:#4a8c4a;
+    --lupins:#c0392b;
+    --faba:#5aa9e0;
+    --lentils:#e8a24a;
+    --new:#2f9e57;
+    --tbc:#cf7626;
+    --cancel:#c43d3d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+  body{max-width:560px;margin:0 auto;min-height:100vh;padding-bottom:48px}
+
+  /* Masthead */
+  .masthead{
+    position:sticky;top:0;z-index:20;
+    background:linear-gradient(180deg,var(--bg) 70%,rgba(247,243,233,0));
+    padding:20px 20px 14px;
+  }
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand h1{
+    font-size:22px;font-weight:800;letter-spacing:-0.02em;color:var(--ink);
+  }
+  .brand .tag{
+    font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;
+    color:var(--gold);
+  }
+  .sub{margin-top:3px;font-size:12.5px;color:var(--ink-faint);display:flex;align-items:center;gap:8px}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--new);display:inline-block;box-shadow:0 0 0 0 rgba(63,181,107,.6);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,181,107,.5)}70%{box-shadow:0 0 0 6px rgba(63,181,107,0)}100%{box-shadow:0 0 0 0 rgba(63,181,107,0)}}
+
+  /* Filter bar */
+  .filterbar{
+    margin-top:12px;display:flex;align-items:center;gap:10px;
+  }
+  .filter-label{
+    font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;
+    color:var(--ink-faint);flex-shrink:0;
+  }
+  .select-wrap{position:relative;flex:1;max-width:280px}
+  .select-wrap select{
+    width:100%;appearance:none;-webkit-appearance:none;
+    font-size:14px;font-weight:700;color:var(--ink);
+    background:var(--panel);border:1px solid var(--line);
+    padding:9px 38px 9px 14px;border-radius:11px;cursor:pointer;
+    font-family:inherit;
+  }
+  .select-wrap select:focus{outline:none;border-color:var(--gold)}
+  .select-wrap .chev{
+    position:absolute;right:13px;top:50%;transform:translateY(-50%);
+    width:16px;height:16px;color:var(--ink-faint);pointer-events:none;
+  }
+
+  /* Day group */
+  .day{margin:0 0 4px}
+  .day-head{
+    position:sticky;top:74px;z-index:10;
+    display:flex;align-items:center;gap:10px;
+    padding:22px 20px 10px;
+    margin-top:6px;
+    background:linear-gradient(180deg,var(--bg) 82%,rgba(247,243,233,0));
+  }
+  .day-head .wd{
+    font-size:17px;font-weight:900;letter-spacing:-0.01em;color:var(--ink);
+    border-bottom:3px solid var(--gold);padding-bottom:3px;
+  }
+  .day-head .cnt{
+    font-size:11px;font-weight:700;color:var(--ink-faint);
+    background:var(--panel-2);border:1px solid var(--line);
+    padding:1px 8px;border-radius:20px;
+  }
+  .day-head .rule{flex:1;height:4px;background:var(--gold);opacity:.35;border-radius:3px}
+  .day-head.is-today .wd{color:var(--gold-soft);border-bottom-color:var(--gold-soft)}
+  .todaypill{
+    font-size:10px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;
+    padding:2px 8px;border-radius:20px;
+    background:var(--gold);color:#fff;
+  }
+
+  /* Job card */
+  .job{
+    margin:0 14px 8px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:13px 15px;
+    display:grid;
+    grid-template-columns:84px 1fr;
+    gap:0 14px;
+    align-items:start;
+    transition:border-color .15s;
+  }
+  .job:active{border-color:var(--gold)}
+  /* next-day tip: loud amber treatment */
+  .job.nextday{
+    border-color:rgba(207,118,38,.5);
+    border-left:4px solid var(--tbc);
+    background:linear-gradient(90deg,rgba(207,118,38,.07),var(--panel) 40%);
+  }
+  .driver-tag{
+    display:inline-flex;align-items:center;gap:5px;
+    font-size:11.5px;font-weight:800;letter-spacing:0.02em;
+    padding:3px 10px;border-radius:7px;
+    background:var(--ink);color:var(--bg);
+  }
+  .driver-tag svg{width:12px;height:12px}
+  .driver-tag.none{background:var(--panel-2);color:var(--ink-faint);border:1px dashed var(--line)}
+  .time{
+    grid-row:1/3;
+    align-self:center;
+    text-align:center;
+    padding-right:13px;
+    border-right:1px solid var(--line);
+  }
+  .time .hm{font-size:16px;font-weight:800;color:var(--gold-soft);letter-spacing:-0.02em;line-height:1.1}
+  .time .ap{font-size:10px;font-weight:700;color:var(--ink-faint);letter-spacing:0.05em}
+  .tipflag-time{
+    margin-top:8px;
+    display:inline-flex;flex-direction:column;align-items:center;gap:2px;
+    font-size:9.5px;font-weight:800;line-height:1.15;letter-spacing:0.01em;
+    color:#fff;background:var(--tbc);
+    padding:5px 6px;border-radius:8px;
+  }
+  .tipflag-time svg{width:13px;height:13px;margin-bottom:1px}
+
+  .job-main{min-width:0}
+  .site-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .tag-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .notes-block{
+    margin-top:10px;background:#fdf6ec;border:1px solid #e8c9a0;
+    border-radius:10px;padding:9px 11px;
+  }
+  .notes-head{
+    font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;
+    color:#b06d1a;margin-bottom:6px;display:flex;align-items:center;gap:5px;
+  }
+  .notes-head svg{width:13px;height:13px}
+  .note-item{
+    font-size:12.5px;color:#4a3f2a;line-height:1.5;padding:4px 0;
+    border-top:1px solid #f0e0c8;
+  }
+  .note-item:first-of-type{border-top:none}
+  .note-who{font-weight:700;color:#8a5a1e}
+  .dest-pill{
+    display:inline-flex;align-items:center;gap:4px;
+    font-size:11px;font-weight:800;letter-spacing:0.03em;text-transform:uppercase;
+    padding:3px 10px 3px 8px;border-radius:7px;color:#fff;white-space:nowrap;
+  }
+  .dest-pill svg{width:12px;height:12px;flex-shrink:0}
+  .site{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-0.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .badge{
+    flex-shrink:0;font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;
+    padding:3px 8px;border-radius:6px;color:#14110d;
+  }
+  .b-oats{background:var(--oats);color:#fff}
+  .b-wheat{background:var(--wheat)}
+  .b-barley{background:var(--barley)}
+  .b-canola{background:var(--canola);color:#fff}
+  .b-peas{background:var(--peas);color:#fff}
+  .b-lupins{background:var(--lupins);color:#fff}
+  .b-faba{background:var(--faba);color:#fff}
+  .b-lentils{background:var(--lentils);color:#14110d}
+  .b-other{background:var(--panel-2);color:var(--ink-dim);border:1px solid var(--line)}
+
+  .meta{margin-top:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .release{
+    margin-top:6px;font-size:12px;font-weight:700;letter-spacing:0.04em;
+    color:var(--ink-dim);font-family:ui-monospace,'SF Mono',Menlo,monospace;
+  }
+  .tipflag{
+    font-size:11.5px;font-weight:800;letter-spacing:0.02em;
+    padding:3px 11px;border-radius:20px;
+    color:#fff;background:var(--tbc);border:1px solid var(--tbc);
+    display:inline-flex;align-items:center;gap:5px;
+  }
+  .tipflag svg{width:12px;height:12px}
+  .status{
+    font-size:11px;font-weight:700;letter-spacing:0.03em;
+    padding:2px 9px;border-radius:20px;border:1px solid var(--line);color:var(--ink-dim);
+  }
+  .s-new{color:var(--new);border-color:rgba(63,181,107,.4);background:rgba(63,181,107,.08)}
+  .s-tbc{color:var(--tbc);border-color:rgba(224,138,60,.4);background:rgba(224,138,60,.08)}
+  .s-cancel{color:var(--cancel);border-color:rgba(214,81,81,.4);background:rgba(214,81,81,.08);text-decoration:line-through}
+
+  .actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+  .actions .act{flex:1 1 calc(50% - 4px);min-width:90px}
+  .act{
+    flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+    text-decoration:none;position:relative;
+    font-size:12.5px;font-weight:700;
+    padding:8px 10px;border-radius:9px;
+    background:var(--panel-2);border:1px solid var(--line);color:var(--ink-dim);
+  }
+  .act:active{background:var(--line)}
+  .act svg{width:14px;height:14px;flex-shrink:0}
+  .act.call{color:var(--gold-soft)}
+  .act.maps{color:var(--ink)}
+  .act.note{color:var(--ink-dim)}
+  .note-badge{
+    position:absolute;top:-7px;right:-7px;
+    min-width:20px;height:20px;padding:0 5px;
+    background:var(--tbc);color:#fff;
+    font-size:11px;font-weight:800;
+    border-radius:20px;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 1px 3px rgba(0,0,0,.2);
+  }
+  .notes-toggle{cursor:pointer;font-family:inherit;color:var(--tbc)}
+  .notes-toggle.open{background:var(--tbc);border-color:var(--tbc);color:#fff}
+  .notes-toggle.open .note-badge{background:#fff;color:var(--tbc)}
+
+  /* states */
+  .state{padding:60px 30px;text-align:center;color:var(--ink-faint)}
+  .state h2{font-size:16px;color:var(--ink-dim);margin-bottom:8px;font-weight:700}
+  .state p{font-size:13px;line-height:1.6}
+  .spinner{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 18px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .foot{padding:24px 20px 0;text-align:center;color:var(--ink-faint);font-size:11px;line-height:1.7}
+  .foot .upd{color:var(--ink-dim)}
+</style>
+</head>
+<body>
+  <div class="masthead">
+    <div class="brand">
+      <h1>TERKOS</h1>
+      <span class="tag">Haulage</span>
+    </div>
+    <div class="sub"><span class="dot"></span><span id="subline">Loading schedule…</span></div>
+    <div id="filterbar" class="filterbar" style="display:none"></div>
+  </div>
+
+  <div id="content">
+    <div class="state">
+      <div class="spinner"></div>
+      <p>Fetching the latest runs…</p>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="upd" id="updated"></div>
+    <div>Read-only · this week's pickups</div>
+  </div>
+
+<script>
+/* ============================================================
+   CONFIG — paste your published Google Sheet CSV URL here.
+   File → Share → Publish to web → Pickups tab → CSV → copy link.
+   ============================================================ */
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRO6xBBw2sA5fuNB7KZuweFqWZ-qBjMxZx_tinyadnIRp-aT1OqI08T2SktyL94AgsL_Q4CocClh3h4/pub?gid=26836911&single=true&output=csv";
+
+/* ---- column header names as they appear in your sheet ---- */
+const COL = {
+  pickup:   "Pickup Date",
+  tipDate:  "Tip Date",
+  tipTime:  "Tip Time",
+  site:     "Grower / Site",
+  commodity:"Commodity",
+  release:  "Release / Farm #",
+  status:   "Status",
+  driver:   "Driver",
+  phone:    "Grower Phone",
+  maps:     "Maps Link",
+  destination:      "Destination",
+  otherDestination: "Other Destination",
+};
+
+/* ---- destination ribbon colours (add your destinations here) ---- */
+const DEST_COLORS = {
+  "advanced": "#e67e22",        // orange
+  "wesfeeds": "#c2185b",        // pink
+  // DG depots — teal/green family so they read as a group
+  "dg pingelly":    "#00897b",  // teal
+  "dg williams":    "#43a047",  // green
+  "dg wagin":       "#00acc1",  // cyan
+  "dg newdegate":   "#7cb342",  // lime
+  "dg gowangerup":  "#26a69a",  // sea green
+  "dg gnowangerup": "#26a69a",  // (alt spelling — same colour)
+  "dg albany":      "#2e7d32",  // dark green
+};
+function destColor(name){
+  const key=(name||"").trim().toLowerCase();
+  return DEST_COLORS[key] || "#546e7a"; // fallback slate for any unlisted destination
+}
+
+/* ---- Google Form for driver notes (pre-fill) ---- */
+const FORM = {
+  base:   "https://docs.google.com/forms/d/e/1FAIpQLSftxZSOy3Mp92DELJ3oU8V8KStKQU9C9Ms94xCcze8_IjKU5w/viewform?usp=pp_url",
+  job:    "entry.804915953",
+  driver: "entry.823154617",
+};
+/* published CSV of the form-responses sheet (for showing notes on cards) */
+const NOTES_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRO6xBBw2sA5fuNB7KZuweFqWZ-qBjMxZx_tinyadnIRp-aT1OqI08T2SktyL94AgsL_Q4CocClh3h4/pub?gid=1377131357&single=true&output=csv";
+/* responses sheet column names (from the Google Form questions) */
+const NOTE_COL = { job:"Job", driver:"Driver", note:"Note", ts:"Timestamp" };
+
+/* the exact Job string the Note button pre-fills — also used to match notes back to jobs */
+function jobDesc(job){
+  return [job._d?dayLabel(job._d):"", fmtTime(job[COL.tipTime]).hm+" "+fmtTime(job[COL.tipTime]).ap,
+          (job[COL.site]||"").trim(), (job[COL.release]||"").trim()]
+          .filter(Boolean).join(" · ");
+}
+/* normalise for matching (ignore case/spacing differences) */
+function jobKey(s){ return (s||"").toLowerCase().replace(/\s+/g," ").trim(); }
+
+function noteLink(job){
+  const drv=(job[COL.driver]||"").trim();
+  return `${FORM.base}&${FORM.job}=${encodeURIComponent(jobDesc(job))}&${FORM.driver}=${encodeURIComponent(drv)}`;
+}
+
+/* notes grouped by job key, filled after the responses CSV loads */
+let NOTES_BY_JOB = {};
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const WDAYS  = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+/* tiny CSV parser (handles quoted fields + commas) */
+function parseCSV(text){
+  const rows=[];let row=[],cur="",q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; }
+      else cur+=c;
+    }else{
+      if(c==='"')q=true;
+      else if(c===',') {row.push(cur);cur="";}
+      else if(c==='\n'){row.push(cur);rows.push(row);row=[];cur="";}
+      else if(c==='\r'){}
+      else cur+=c;
+    }
+  }
+  if(cur!==""||row.length){row.push(cur);rows.push(row);}
+  return rows;
+}
+
+/* parse a pickup-date cell — handles "Mon 22 Jun", "22/06/2026", ISO, etc. */
+function parseDate(s){
+  if(!s) return null;
+  s=s.trim();
+  // ISO yyyy-mm-dd or yyyy/mm/dd
+  let m=s.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  // dd/mm/yyyy (Aussie)
+  m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+  // "Mon 22 Jun" or "22 Jun" or "22 Jun 2026"
+  m=s.match(/(\d{1,2})\s+([A-Za-z]{3})/);
+  if(m){
+    const day=+m[1], mon=MONTHS.findIndex(x=>x.toLowerCase()===m[2].toLowerCase());
+    if(mon>=0){
+      const ym=s.match(/(\d{4})/);
+      let year= ym?+ym[1]:guessYear(mon);
+      return new Date(year,mon,day);
+    }
+  }
+  const d=new Date(s); return isNaN(d)?null:d;
+}
+/* if no year given, pick the year that keeps the date nearest to now (handles Dec/Jan wrap) */
+function guessYear(mon){
+  const now=new Date(), y=now.getFullYear();
+  const cand=[y-1,y,y+1].map(yr=>({yr,diff:Math.abs(new Date(yr,mon,15)-now)}));
+  cand.sort((a,b)=>a.diff-b.diff);
+  return cand[0].yr;
+}
+
+function fmtTime(s){
+  if(!s) return {hm:"",ap:""};
+  s=s.trim();
+  let m=s.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/);
+  if(!m){ // maybe "14:30:00"
+    m=s.match(/^(\d{1,2}):(\d{2})/);
+  }
+  if(!m) return {hm:s,ap:""};
+  let h=+m[1], min=m[2], ap=(m[3]||"").toUpperCase();
+  if(!ap){ ap = h<12?"AM":"PM"; if(h===0)h=12; else if(h>12)h-=12; }
+  return {hm:`${h}:${min}`, ap};
+}
+
+/* convert a tip-time string to minutes-since-midnight for correct sorting */
+function timeMinutes(s){
+  if(!s) return 99999;
+  s=s.trim();
+  let m=s.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/);
+  if(!m) return 99999;
+  let h=+m[1], min=+m[2], ap=(m[3]||"").toUpperCase();
+  if(ap==="AM"){ if(h===12) h=0; }
+  else if(ap==="PM"){ if(h!==12) h+=12; }
+  // no am/pm → already 24h
+  return h*60+min;
+}
+
+/* 0 = tips same day as pickup, 1 = tips a later day (next-day) */
+function tipRank(j){
+  const tipD=parseDate(j[COL.tipDate]);
+  if(tipD && j._d && dayKey(tipD)!==dayKey(j._d)) return 1;
+  return 0;
+}
+
+function commodityClass(c){
+  c=(c||"").toLowerCase();
+  if(c.includes("oat"))return"b-oats";
+  if(c.includes("wheat"))return"b-wheat";
+  if(c.includes("barley"))return"b-barley";
+  if(c.includes("canola"))return"b-canola";
+  if(c.includes("pea"))return"b-peas";
+  if(c.includes("lupin"))return"b-lupins";
+  if(c.includes("faba")||c.includes("fava"))return"b-faba";
+  if(c.includes("lentil"))return"b-lentils";
+  return"b-other";
+}
+function statusClass(s){
+  s=(s||"").toLowerCase();
+  if(s.includes("new"))return"s-new";
+  if(s.includes("tbc"))return"s-tbc";
+  if(s.includes("cancel"))return"s-cancel";
+  return"";
+}
+
+function dayKey(d){return d.getFullYear()*10000+d.getMonth()*100+d.getDate();}
+function dayLabel(d){return `${WDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;}
+
+let WEEK_JOBS=[];           // all jobs in current week (pre-filter)
+let ACTIVE_DRIVER="__ALL__"; // current filter selection
+let WEEK_META=null;
+
+function render(records){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const dow=today.getDay();
+  const monOffset=(dow===0?-6:1-dow);
+  const weekStart=new Date(today); weekStart.setDate(today.getDate()+monOffset);
+  const weekEnd=new Date(weekStart); weekEnd.setDate(weekStart.getDate()+6); weekEnd.setHours(23,59,59,999);
+
+  let jobs=records.map(r=>{
+    const d=parseDate(r[COL.pickup]);
+    return d?{...r,_d:d}:null;
+  }).filter(Boolean).filter(j=>j._d>=weekStart && j._d<=weekEnd);
+
+  WEEK_JOBS=jobs;
+  WEEK_META={today,weekStart,weekEnd};
+  buildFilterBar();
+  paint();
+}
+
+function driverName(j){return (j[COL.driver]||"").trim();}
+
+function buildFilterBar(){
+  const bar=document.getElementById("filterbar");
+  // collect distinct driver names that appear this week
+  const counts={};
+  WEEK_JOBS.forEach(j=>{const d=driverName(j); if(d) counts[d]=(counts[d]||0)+1;});
+  const names=Object.keys(counts).sort((a,b)=>a.localeCompare(b));
+  const unassigned=WEEK_JOBS.filter(j=>!driverName(j)).length;
+
+  if(!names.length && !unassigned){ bar.style.display="none"; return; }
+
+  // if previously-active driver no longer exists, reset to ALL
+  if(ACTIVE_DRIVER!=="__ALL__" && ACTIVE_DRIVER!=="__NONE__" && !counts[ACTIVE_DRIVER]) ACTIVE_DRIVER="__ALL__";
+
+  let opts=`<option value="__ALL__"${ACTIVE_DRIVER==='__ALL__'?' selected':''}>All drivers (${WEEK_JOBS.length})</option>`;
+  names.forEach(n=>{
+    opts+=`<option value="${escapeHtml(n)}"${ACTIVE_DRIVER===n?' selected':''}>${escapeHtml(n)} (${counts[n]})</option>`;
+  });
+  if(unassigned){
+    opts+=`<option value="__NONE__"${ACTIVE_DRIVER==='__NONE__'?' selected':''}>Unassigned (${unassigned})</option>`;
+  }
+
+  bar.innerHTML=`<label class="filter-label">Show</label>
+    <div class="select-wrap">
+      <select id="driverSelect">${opts}</select>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+    </div>`;
+  bar.style.display="flex";
+  const sel=document.getElementById("driverSelect");
+  sel.onchange=()=>{ ACTIVE_DRIVER=sel.value; paint(); };
+}
+
+function paint(){
+  const content=document.getElementById("content");
+  const {today,weekStart,weekEnd}=WEEK_META;
+
+  // apply driver filter
+  let jobs=WEEK_JOBS.filter(j=>{
+    if(ACTIVE_DRIVER==="__ALL__")return true;
+    if(ACTIVE_DRIVER==="__NONE__")return !driverName(j);
+    return driverName(j)===ACTIVE_DRIVER;
+  });
+
+  if(!jobs.length){
+    content.innerHTML=`<div class="state"><h2>No runs to show</h2><p>${ACTIVE_DRIVER==="__ALL__"?"Nothing scheduled for the current week.":"No runs for this selection this week."}</p></div>`;
+  }else{
+    jobs.sort((a,b)=>{
+      if(dayKey(a._d)!==dayKey(b._d))return a._d-b._d;
+      // same-day tips first, then next-day (later) tips
+      const ra=tipRank(a), rb=tipRank(b);
+      if(ra!==rb) return ra-rb;
+      return timeMinutes(a[COL.tipTime]) - timeMinutes(b[COL.tipTime]);
+    });
+    const groups=[];let cur=null;
+    jobs.forEach(j=>{const k=dayKey(j._d); if(!cur||cur.k!==k){cur={k,d:j._d,items:[]};groups.push(cur);} cur.items.push(j);});
+
+    let html="";
+    groups.forEach(g=>{
+      const isToday=dayKey(g.d)===dayKey(today);
+      const todayPill=isToday?`<span class="todaypill">Today</span>`:"";
+      html+=`<div class="day"><div class="day-head${isToday?" is-today":""}"><span class="wd">${dayLabel(g.d)}</span>${todayPill}<span class="cnt">${g.items.length}</span><span class="rule"></span></div>`;
+      g.items.forEach(j=>{
+        const t=fmtTime(j[COL.tipTime]);
+        const site=j[COL.site]||"—";
+        const comm=j[COL.commodity]||"";
+        const status=j[COL.status]||"";
+        const phone=(j[COL.phone]||"").trim();
+        const maps=(j[COL.maps]||"").trim();
+        const release=(j[COL.release]||"").trim();
+        let dest=(j[COL.destination]||"").trim();
+        // if Destination is "Other", use the Other Destination text
+        if(dest.toLowerCase()==="other"){
+          const other=(j[COL.otherDestination]||"").trim();
+          if(other) dest=other;
+        }
+        const drv=driverName(j);
+        const sc=statusClass(status);
+
+        let isNextDay=false, tipFlagTime="";
+        const tipD=parseDate(j[COL.tipDate]);
+        if(tipD && j._d && dayKey(tipD)!==dayKey(j._d)){
+          isNextDay=true;
+          tipFlagTime=`<div class="tipflag-time"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><span>Tips</span><span>${dayLabel(tipD)}</span></div>`;
+        }
+
+        // driver tag
+        const drvTag = drv
+          ? `<div class="driver-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>${escapeHtml(drv)}</div>`
+          : `<div class="driver-tag none">Unassigned</div>`;
+
+        let actions="";
+        if(phone){
+          const tel=phone.replace(/[^\d+]/g,"");
+          actions+=`<a class="act call" href="tel:${tel}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>Call</a>`;
+        }
+        if(maps && /^https?:\/\//i.test(maps)){
+          actions+=`<a class="act maps" href="${maps}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a>`;
+        }
+        // count matched notes for this job
+        const jkey=jobKey(jobDesc(j));
+        const jNotes=NOTES_BY_JOB[jkey];
+        const noteCount=jNotes?jNotes.length:0;
+        const noteUid="n"+Math.random().toString(36).slice(2,9);
+
+        // "View notes (N)" toggle button (only if notes exist)
+        if(noteCount){
+          actions+=`<button class="act notes-toggle" type="button" onclick="toggleNotes('${noteUid}',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Notes<span class="note-badge">${noteCount}</span></button>`;
+        }
+        // "Add note" always available
+        actions+=`<a class="act note" href="${noteLink(j)}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add note</a>`;
+        if(actions) actions=`<div class="actions">${actions}</div>`;
+
+        // collapsible notes panel (hidden until toggled)
+        let notesBlock="";
+        if(noteCount){
+          const items=jNotes.map(n=>{
+            const who=n.driver?`<span class="note-who">${escapeHtml(n.driver)}:</span> `:"";
+            return `<div class="note-item">${who}${escapeHtml(n.note)}</div>`;
+          }).join("");
+          notesBlock=`<div class="notes-block" id="${noteUid}" style="display:none">${items}</div>`;
+        }
+
+        // destination ribbon (only when Destination has a value)
+        let destRibbon="";
+        if(dest){
+          destRibbon=`<span class="dest-pill" style="background:${destColor(dest)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>${escapeHtml(dest)}</span>`;
+        }
+
+        html+=`<div class="job${isNextDay?" nextday":""}">
+          <div class="time"><div class="hm">${t.hm}</div><div class="ap">${t.ap}</div>${tipFlagTime}</div>
+          <div class="job-main">
+            <div class="site-row">
+              <span class="site">${escapeHtml(site)}</span>
+              ${comm?`<span class="badge ${commodityClass(comm)}">${escapeHtml(comm)}</span>`:""}
+            </div>
+            ${release?`<div class="release">${escapeHtml(release)}</div>`:""}
+            <div class="meta">
+              ${status?`<span class="status ${sc}">${escapeHtml(status)}</span>`:""}
+            </div>
+            <div class="tag-row">
+              ${drvTag}
+              ${destRibbon}
+            </div>
+            ${actions}
+            ${notesBlock}
+          </div>
+        </div>`;
+      });
+      html+=`</div>`;
+    });
+    content.innerHTML=html;
+  }
+
+  const total=jobs.length;
+  const wkLabel=`${weekStart.getDate()} ${MONTHS[weekStart.getMonth()]} – ${weekEnd.getDate()} ${MONTHS[weekEnd.getMonth()]}`;
+  const who = ACTIVE_DRIVER==="__ALL__" ? "" : ACTIVE_DRIVER==="__NONE__" ? " · unassigned" : ` · ${ACTIVE_DRIVER}`;
+  document.getElementById("subline").textContent=`${total} run${total!==1?"s":""} · week of ${wkLabel}${who}`;
+}
+
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+function recordsFromCSV(text){
+  const rows=parseCSV(text).filter(r=>r.some(c=>c.trim()!==""));
+  if(!rows.length)return[];
+  const head=rows[0].map(h=>h.trim());
+  return rows.slice(1).map(r=>{
+    const o={};head.forEach((h,i)=>o[h]=(r[i]||"").trim());return o;
+  });
+}
+
+/* expand/collapse a job's notes panel */
+function toggleNotes(id, btn){
+  const el=document.getElementById(id);
+  if(!el) return;
+  const open=el.style.display!=="none";
+  el.style.display=open?"none":"block";
+  if(btn) btn.classList.toggle("open", !open);
+}
+
+async function loadNotes(){
+  if(!NOTES_CSV || NOTES_CSV.includes("PASTE_")) return;
+  try{
+    const res=await fetch(NOTES_CSV+(NOTES_CSV.includes("?")?"&":"?")+"_cb="+Date.now());
+    if(!res.ok) return;
+    const recs=recordsFromCSV(await res.text());
+    const map={};
+    recs.forEach(r=>{
+      const k=jobKey(r[NOTE_COL.job]);
+      if(!k) return;
+      (map[k]=map[k]||[]).push({
+        driver:(r[NOTE_COL.driver]||"").trim(),
+        note:(r[NOTE_COL.note]||"").trim(),
+        ts:(r[NOTE_COL.ts]||"").trim()
+      });
+    });
+    // keep only rows that actually have note text
+    Object.keys(map).forEach(k=>{ map[k]=map[k].filter(n=>n.note); if(!map[k].length) delete map[k]; });
+    NOTES_BY_JOB=map;
+  }catch(e){ /* notes are best-effort; ignore failures */ }
+}
+
+async function load(){
+  if(CSV_URL.includes("PASTE_YOUR")){
+    // demo mode
+    await loadNotes();
+    render(DEMO);
+    document.getElementById("updated").textContent="Demo preview — live data not connected yet";
+    return;
+  }
+  try{
+    await loadNotes(); // notes first so cards can show them
+    const res=await fetch(CSV_URL+ (CSV_URL.includes("?")?"&":"?") +"_cb="+Date.now());
+    if(!res.ok)throw new Error(res.status);
+    const text=await res.text();
+    render(recordsFromCSV(text));
+    const now=new Date();
+    document.getElementById("updated").textContent="Updated "+now.toLocaleString("en-AU",{weekday:"short",day:"numeric",month:"short",hour:"numeric",minute:"2-digit"});
+  }catch(e){
+    document.getElementById("content").innerHTML=`<div class="state"><h2>Couldn't load the schedule</h2><p>Check your connection and pull down to refresh. If it keeps failing, the schedule link may need re-publishing.</p></div>`;
+    document.getElementById("subline").textContent="Connection problem";
+  }
+}
+
+/* demo data so you can preview the look before connecting the sheet */
+const DEMO=(()=>{
+  const today=new Date();today.setHours(0,0,0,0);
+  const dow=today.getDay();const monOff=(dow===0?-6:1-dow);
+  const mon=new Date(today);mon.setDate(today.getDate()+monOff);
+  const d=(off)=>{const x=new Date(mon);x.setDate(mon.getDate()+off);return `${WDAYS[x.getDay()]} ${x.getDate()} ${MONTHS[x.getMonth()]}`;};
+  return [
+    {"Pickup Date":d(0),"Tip Date":d(0),"Tip Time":"7:00 AM","Grower / Site":"ex CBH Hyden","Commodity":"Oats","Release / Farm #":"2206OAT1HYDGEN","Status":"Scheduled","Driver":"Andy","Grower Phone":"","Maps Link":""},
+    {"Pickup Date":d(0),"Tip Date":d(1),"Tip Time":"1:45 PM","Grower / Site":"Beau Graham","Commodity":"Peas","Release / Farm #":"1905PEA2NARGEN","Status":"New","Driver":"Bill","Grower Phone":"0428 117 442","Maps Link":"https://maps.google.com"},
+    {"Pickup Date":d(1),"Tip Date":d(1),"Tip Time":"3:30 PM","Grower / Site":"ex CBH Hyden","Commodity":"Oats","Release / Farm #":"2206OAT1HYDGEN","Status":"TBC","Driver":"Casey","Grower Phone":"","Maps Link":""},
+    {"Pickup Date":d(1),"Tip Date":d(2),"Tip Time":"8:00 AM","Grower / Site":"CBH Kukerin","Commodity":"Wheat","Release / Farm #":"2006WHE1KUKGEN","Status":"Scheduled","Driver":"Terkos 1","Grower Phone":"","Maps Link":""},
+    {"Pickup Date":d(2),"Tip Date":d(2),"Tip Time":"10:30 AM","Grower / Site":"Lake Gilmore","Commodity":"Canola","Release / Farm #":"2006CAN1LAKGEN","Status":"Scheduled","Driver":"","Grower Phone":"0428 117 442","Maps Link":"https://maps.google.com"},
+    {"Pickup Date":d(3),"Tip Date":d(3),"Tip Time":"9:00 AM","Grower / Site":"CBH Calingiri","Commodity":"Barley","Release / Farm #":"2206BAR1CALGEN","Status":"Scheduled","Driver":"Andy","Grower Phone":"","Maps Link":""},
+  ];
+})();
+
+load();
+/* auto-refresh every 5 min, and on tab refocus */
+setInterval(load,300000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)load();});
+</script>
+</body>
+</html>
