@@ -71,6 +71,27 @@
     width:16px;height:16px;color:var(--ink-faint);pointer-events:none;
   }
 
+  /* Next week preview */
+  .nextweek-toggle{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:calc(100% - 28px);margin:18px 14px 6px;
+    background:var(--panel-2);border:1px dashed var(--line);border-radius:12px;
+    padding:11px 14px;cursor:pointer;font-family:inherit;
+    font-size:12.5px;font-weight:800;letter-spacing:0.03em;text-transform:uppercase;
+    color:var(--ink-dim);
+  }
+  .nextweek-toggle svg{width:14px;height:14px;transition:transform .2s}
+  .nextweek-toggle.open svg{transform:rotate(180deg)}
+  .nextweek-toggle .cnt{
+    font-size:11px;font-weight:700;color:var(--ink-faint);
+    background:var(--panel);border:1px solid var(--line);
+    padding:1px 8px;border-radius:20px;text-transform:none;letter-spacing:0;
+  }
+  .nextweek-content{display:none}
+  .nextweek-content .day-head .wd{color:var(--ink-dim);border-bottom-color:var(--ink-faint)}
+  .nextweek-content .day-head .rule{background:var(--ink-faint);opacity:.3}
+  .nextweek-content .job{opacity:.88}
+
   /* Day group */
   .day{margin:0 0 4px}
   .day-head{
@@ -440,6 +461,8 @@ function dayKey(d){return d.getFullYear()*10000+d.getMonth()*100+d.getDate();}
 function dayLabel(d){return `${WDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;}
 
 let WEEK_JOBS=[];           // all jobs in current week (pre-filter)
+let NEXT_WEEK_JOBS=[];      // all jobs in the following week (pre-filter)
+let NEXTWEEK_OPEN=false;    // whether the next-week preview is expanded
 let ACTIVE_DRIVER="__ALL__"; // current filter selection
 let WEEK_META=null;
 
@@ -449,14 +472,17 @@ function render(records){
   const monOffset=(dow===0?-6:1-dow);
   const weekStart=new Date(today); weekStart.setDate(today.getDate()+monOffset);
   const weekEnd=new Date(weekStart); weekEnd.setDate(weekStart.getDate()+6); weekEnd.setHours(23,59,59,999);
+  const nextWeekStart=new Date(weekStart); nextWeekStart.setDate(weekStart.getDate()+7);
+  const nextWeekEnd=new Date(nextWeekStart); nextWeekEnd.setDate(nextWeekStart.getDate()+6); nextWeekEnd.setHours(23,59,59,999);
 
-  let jobs=records.map(r=>{
+  const allJobs=records.map(r=>{
     const d=parseDate(r[COL.pickup]);
     return d?{...r,_d:d}:null;
-  }).filter(Boolean).filter(j=>j._d>=weekStart && j._d<=weekEnd);
+  }).filter(Boolean);
 
-  WEEK_JOBS=jobs;
-  WEEK_META={today,weekStart,weekEnd};
+  WEEK_JOBS=allJobs.filter(j=>j._d>=weekStart && j._d<=weekEnd);
+  NEXT_WEEK_JOBS=allJobs.filter(j=>j._d>=nextWeekStart && j._d<=nextWeekEnd);
+  WEEK_META={today,weekStart,weekEnd,nextWeekStart,nextWeekEnd};
   buildFilterBar();
   paint();
 }
@@ -494,125 +520,158 @@ function buildFilterBar(){
   sel.onchange=()=>{ ACTIVE_DRIVER=sel.value; paint(); };
 }
 
+function jobCardHTML(j){
+  const t=fmtTime(j[COL.tipTime]);
+  const site=j[COL.site]||"—";
+  const comm=j[COL.commodity]||"";
+  const status=j[COL.status]||"";
+  const phone=(j[COL.phone]||"").trim();
+  const maps=(j[COL.maps]||"").trim();
+  const release=(j[COL.release]||"").trim();
+  let dest=(j[COL.destination]||"").trim();
+  // if Destination is "Other", use the Other Destination text
+  if(dest.toLowerCase()==="other"){
+    const other=(j[COL.otherDestination]||"").trim();
+    if(other) dest=other;
+  }
+  const drv=driverName(j);
+  const sc=statusClass(status);
+
+  let isNextDay=false, tipFlagTime="";
+  const tipD=parseDate(j[COL.tipDate]);
+  if(tipD && j._d && dayKey(tipD)!==dayKey(j._d)){
+    isNextDay=true;
+    tipFlagTime=`<div class="tipflag-time"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><span>Tips</span><span>${dayLabel(tipD)}</span></div>`;
+  }
+
+  // driver tag
+  const drvTag = drv
+    ? `<div class="driver-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>${escapeHtml(drv)}</div>`
+    : `<div class="driver-tag none">Unassigned</div>`;
+
+  let actions="";
+  if(phone){
+    const tel=phone.replace(/[^\d+]/g,"");
+    actions+=`<a class="act call" href="tel:${tel}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>Call</a>`;
+  }
+  if(maps && /^https?:\/\//i.test(maps)){
+    actions+=`<a class="act maps" href="${maps}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a>`;
+  }
+  // count matched notes for this job
+  const jkey=jobKey(jobDesc(j));
+  const jNotes=NOTES_BY_JOB[jkey];
+  const noteCount=jNotes?jNotes.length:0;
+  const noteUid="n"+Math.random().toString(36).slice(2,9);
+
+  // "View notes (N)" toggle button (only if notes exist)
+  if(noteCount){
+    actions+=`<button class="act notes-toggle" type="button" onclick="toggleNotes('${noteUid}',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Notes<span class="note-badge">${noteCount}</span></button>`;
+  }
+  // "Add note" always available
+  actions+=`<a class="act note" href="${noteLink(j)}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add note</a>`;
+  if(actions) actions=`<div class="actions">${actions}</div>`;
+
+  // collapsible notes panel (hidden until toggled)
+  let notesBlock="";
+  if(noteCount){
+    const items=jNotes.map(n=>{
+      const who=n.driver?`<span class="note-who">${escapeHtml(n.driver)}:</span> `:"";
+      return `<div class="note-item">${who}${escapeHtml(n.note)}</div>`;
+    }).join("");
+    notesBlock=`<div class="notes-block" id="${noteUid}" style="display:none">${items}</div>`;
+  }
+
+  // destination ribbon (only when Destination has a value)
+  let destRibbon="";
+  if(dest){
+    destRibbon=`<span class="dest-pill" style="background:${destColor(dest)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>${escapeHtml(dest)}</span>`;
+  }
+
+  return `<div class="job${isNextDay?" nextday":""}">
+    <div class="time"><div class="hm">${t.hm}</div><div class="ap">${t.ap}</div>${tipFlagTime}</div>
+    <div class="job-main">
+      <div class="site-row">
+        <span class="site">${escapeHtml(site)}</span>
+        ${comm?`<span class="badge ${commodityClass(comm)}">${escapeHtml(comm)}</span>`:""}
+      </div>
+      ${release?`<div class="release">${escapeHtml(release)}</div>`:""}
+      <div class="meta">
+        ${status?`<span class="status ${sc}">${escapeHtml(status)}</span>`:""}
+      </div>
+      <div class="tag-row">
+        ${drvTag}
+        ${destRibbon}
+      </div>
+      ${actions}
+      ${notesBlock}
+    </div>
+  </div>`;
+}
+
+/* sort a job list into date order, then group into {k,d,items} day buckets */
+function groupJobsByDay(jobs){
+  jobs=jobs.slice().sort((a,b)=>{
+    if(dayKey(a._d)!==dayKey(b._d))return a._d-b._d;
+    // same-day tips first, then next-day (later) tips
+    const ra=tipRank(a), rb=tipRank(b);
+    if(ra!==rb) return ra-rb;
+    return timeMinutes(a[COL.tipTime]) - timeMinutes(b[COL.tipTime]);
+  });
+  const groups=[];let cur=null;
+  jobs.forEach(j=>{const k=dayKey(j._d); if(!cur||cur.k!==k){cur={k,d:j._d,items:[]};groups.push(cur);} cur.items.push(j);});
+  return groups;
+}
+
+/* render a list of day groups into the day-head + job-card markup */
+function dayGroupsHTML(groups, today){
+  let html="";
+  groups.forEach(g=>{
+    const isToday=dayKey(g.d)===dayKey(today);
+    const todayPill=isToday?`<span class="todaypill">Today</span>`:"";
+    html+=`<div class="day"><div class="day-head${isToday?" is-today":""}"><span class="wd">${dayLabel(g.d)}</span>${todayPill}<span class="cnt">${g.items.length}</span><span class="rule"></span></div>`;
+    g.items.forEach(j=>{ html+=jobCardHTML(j); });
+    html+=`</div>`;
+  });
+  return html;
+}
+
 function paint(){
   const content=document.getElementById("content");
   const {today,weekStart,weekEnd}=WEEK_META;
 
   // apply driver filter
-  let jobs=WEEK_JOBS.filter(j=>{
+  const matchesDriver=j=>{
     if(ACTIVE_DRIVER==="__ALL__")return true;
     if(ACTIVE_DRIVER==="__NONE__")return !driverName(j);
     return driverName(j)===ACTIVE_DRIVER;
-  });
+  };
+  let jobs=WEEK_JOBS.filter(matchesDriver);
+  let nextJobs=NEXT_WEEK_JOBS.filter(matchesDriver);
 
   if(!jobs.length){
     content.innerHTML=`<div class="state"><h2>No runs to show</h2><p>${ACTIVE_DRIVER==="__ALL__"?"Nothing scheduled for the current week.":"No runs for this selection this week."}</p></div>`;
   }else{
-    jobs.sort((a,b)=>{
-      if(dayKey(a._d)!==dayKey(b._d))return a._d-b._d;
-      // same-day tips first, then next-day (later) tips
-      const ra=tipRank(a), rb=tipRank(b);
-      if(ra!==rb) return ra-rb;
-      return timeMinutes(a[COL.tipTime]) - timeMinutes(b[COL.tipTime]);
-    });
-    const groups=[];let cur=null;
-    jobs.forEach(j=>{const k=dayKey(j._d); if(!cur||cur.k!==k){cur={k,d:j._d,items:[]};groups.push(cur);} cur.items.push(j);});
+    const groups=groupJobsByDay(jobs);
+    content.innerHTML=dayGroupsHTML(groups, today);
+  }
 
-    let html="";
-    groups.forEach(g=>{
-      const isToday=dayKey(g.d)===dayKey(today);
-      const todayPill=isToday?`<span class="todaypill">Today</span>`:"";
-      html+=`<div class="day"><div class="day-head${isToday?" is-today":""}"><span class="wd">${dayLabel(g.d)}</span>${todayPill}<span class="cnt">${g.items.length}</span><span class="rule"></span></div>`;
-      g.items.forEach(j=>{
-        const t=fmtTime(j[COL.tipTime]);
-        const site=j[COL.site]||"—";
-        const comm=j[COL.commodity]||"";
-        const status=j[COL.status]||"";
-        const phone=(j[COL.phone]||"").trim();
-        const maps=(j[COL.maps]||"").trim();
-        const release=(j[COL.release]||"").trim();
-        let dest=(j[COL.destination]||"").trim();
-        // if Destination is "Other", use the Other Destination text
-        if(dest.toLowerCase()==="other"){
-          const other=(j[COL.otherDestination]||"").trim();
-          if(other) dest=other;
-        }
-        const drv=driverName(j);
-        const sc=statusClass(status);
-
-        let isNextDay=false, tipFlagTime="";
-        const tipD=parseDate(j[COL.tipDate]);
-        if(tipD && j._d && dayKey(tipD)!==dayKey(j._d)){
-          isNextDay=true;
-          tipFlagTime=`<div class="tipflag-time"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><span>Tips</span><span>${dayLabel(tipD)}</span></div>`;
-        }
-
-        // driver tag
-        const drvTag = drv
-          ? `<div class="driver-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>${escapeHtml(drv)}</div>`
-          : `<div class="driver-tag none">Unassigned</div>`;
-
-        let actions="";
-        if(phone){
-          const tel=phone.replace(/[^\d+]/g,"");
-          actions+=`<a class="act call" href="tel:${tel}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>Call</a>`;
-        }
-        if(maps && /^https?:\/\//i.test(maps)){
-          actions+=`<a class="act maps" href="${maps}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a>`;
-        }
-        // count matched notes for this job
-        const jkey=jobKey(jobDesc(j));
-        const jNotes=NOTES_BY_JOB[jkey];
-        const noteCount=jNotes?jNotes.length:0;
-        const noteUid="n"+Math.random().toString(36).slice(2,9);
-
-        // "View notes (N)" toggle button (only if notes exist)
-        if(noteCount){
-          actions+=`<button class="act notes-toggle" type="button" onclick="toggleNotes('${noteUid}',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Notes<span class="note-badge">${noteCount}</span></button>`;
-        }
-        // "Add note" always available
-        actions+=`<a class="act note" href="${noteLink(j)}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Add note</a>`;
-        if(actions) actions=`<div class="actions">${actions}</div>`;
-
-        // collapsible notes panel (hidden until toggled)
-        let notesBlock="";
-        if(noteCount){
-          const items=jNotes.map(n=>{
-            const who=n.driver?`<span class="note-who">${escapeHtml(n.driver)}:</span> `:"";
-            return `<div class="note-item">${who}${escapeHtml(n.note)}</div>`;
-          }).join("");
-          notesBlock=`<div class="notes-block" id="${noteUid}" style="display:none">${items}</div>`;
-        }
-
-        // destination ribbon (only when Destination has a value)
-        let destRibbon="";
-        if(dest){
-          destRibbon=`<span class="dest-pill" style="background:${destColor(dest)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>${escapeHtml(dest)}</span>`;
-        }
-
-        html+=`<div class="job${isNextDay?" nextday":""}">
-          <div class="time"><div class="hm">${t.hm}</div><div class="ap">${t.ap}</div>${tipFlagTime}</div>
-          <div class="job-main">
-            <div class="site-row">
-              <span class="site">${escapeHtml(site)}</span>
-              ${comm?`<span class="badge ${commodityClass(comm)}">${escapeHtml(comm)}</span>`:""}
-            </div>
-            ${release?`<div class="release">${escapeHtml(release)}</div>`:""}
-            <div class="meta">
-              ${status?`<span class="status ${sc}">${escapeHtml(status)}</span>`:""}
-            </div>
-            <div class="tag-row">
-              ${drvTag}
-              ${destRibbon}
-            </div>
-            ${actions}
-            ${notesBlock}
-          </div>
-        </div>`;
-      });
-      html+=`</div>`;
-    });
-    content.innerHTML=html;
+  // next-week preview toggle, appended after current week
+  if(nextJobs.length){
+    const nextGroups=groupJobsByDay(nextJobs);
+    const preview=document.createElement("div");
+    preview.innerHTML=`<button type="button" class="nextweek-toggle${NEXTWEEK_OPEN?" open":""}" id="nextweekToggle">
+        <span>Next week preview</span><span class="cnt">${nextJobs.length}</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="nextweek-content" id="nextweekContent" style="display:${NEXTWEEK_OPEN?"block":"none"}">${dayGroupsHTML(nextGroups, today)}</div>`;
+    content.appendChild(preview);
+    document.getElementById("nextweekToggle").onclick=()=>{
+      NEXTWEEK_OPEN=!NEXTWEEK_OPEN;
+      const el=document.getElementById("nextweekContent");
+      const btn=document.getElementById("nextweekToggle");
+      el.style.display=NEXTWEEK_OPEN?"block":"none";
+      btn.classList.toggle("open",NEXTWEEK_OPEN);
+    };
   }
 
   const total=jobs.length;
