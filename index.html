@@ -491,11 +491,13 @@ function driverName(j){return (j[COL.driver]||"").trim();}
 
 function buildFilterBar(){
   const bar=document.getElementById("filterbar");
-  // collect distinct driver names that appear this week
+  // collect distinct driver names appearing this week OR next week,
+  // so a driver with only next-week jobs still shows up to filter by
   const counts={};
   WEEK_JOBS.forEach(j=>{const d=driverName(j); if(d) counts[d]=(counts[d]||0)+1;});
+  NEXT_WEEK_JOBS.forEach(j=>{const d=driverName(j); if(d) counts[d]=(counts[d]||0)+1;});
   const names=Object.keys(counts).sort((a,b)=>a.localeCompare(b));
-  const unassigned=WEEK_JOBS.filter(j=>!driverName(j)).length;
+  const unassigned=WEEK_JOBS.filter(j=>!driverName(j)).length + NEXT_WEEK_JOBS.filter(j=>!driverName(j)).length;
 
   if(!names.length && !unassigned){ bar.style.display="none"; return; }
 
